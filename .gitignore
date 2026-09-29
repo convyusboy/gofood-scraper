@@ -1,3 +1,10 @@
+# macOS
+.DS_Store
+
+# Scraper output
+outputs/
+*.xlsx
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
