@@ -84,25 +84,33 @@ def get_restaurants(output_dir, area, district, category_links):
         path = output_path(output_dir, area, district, category_link)
         wb_obj, sheet_obj = new_results_workbook()
 
-        soup = BeautifulSoup(html_content, "html.parser")
-        restaurants = soup.find_all("a", class_=CLASS_RESTAURANT_CARD)
-        print("total restaurants: {}".format(len(restaurants)))
+        rows = extract_restaurant_rows(html_content)
+        print("total restaurants: {}".format(len(rows)))
 
-        row = 2
-        for restaurant in restaurants:
-            link = RESTAURANT_URL.format(restaurant["href"])
-            image = restaurant.find("img", class_=CLASS_RESTAURANT_IMAGE)["src"]
-            rating_soup = restaurant.find("div", class_=CLASS_RESTAURANT_RATING)
-            rating = rating_soup.text.strip() if rating_soup is not None else "-"
-            name = restaurant.find("p", class_=CLASS_RESTAURANT_NAME).text.strip()
-            type_soup = restaurant.find("p", class_=CLASS_RESTAURANT_TYPE)
-            restaurant_type = type_soup.text.strip() if type_soup is not None else ""
-
-            sheet_obj["A{}".format(row)] = link
-            sheet_obj["B{}".format(row)] = image
-            sheet_obj["C{}".format(row)] = rating
-            sheet_obj["E{}".format(row)] = name
-            sheet_obj["F{}".format(row)] = restaurant_type
-            row += 1
+        for i, restaurant_row in enumerate(rows, start=2):
+            sheet_obj["A{}".format(i)] = restaurant_row["link"]
+            sheet_obj["B{}".format(i)] = restaurant_row["image"]
+            sheet_obj["C{}".format(i)] = restaurant_row["rating"]
+            sheet_obj["E{}".format(i)] = restaurant_row["name"]
+            sheet_obj["F{}".format(i)] = restaurant_row["type"]
 
         wb_obj.save(path)
+
+
+def extract_restaurant_rows(html_content):
+    """Parse a restaurant listing page's HTML into a list of {link, image, rating, name, type} dicts."""
+    soup = BeautifulSoup(html_content, "html.parser")
+    restaurants = soup.find_all("a", class_=CLASS_RESTAURANT_CARD)
+
+    rows = []
+    for restaurant in restaurants:
+        rating_soup = restaurant.find("div", class_=CLASS_RESTAURANT_RATING)
+        type_soup = restaurant.find("p", class_=CLASS_RESTAURANT_TYPE)
+        rows.append({
+            "link": RESTAURANT_URL.format(restaurant["href"]),
+            "image": restaurant.find("img", class_=CLASS_RESTAURANT_IMAGE)["src"],
+            "rating": rating_soup.text.strip() if rating_soup is not None else "-",
+            "name": restaurant.find("p", class_=CLASS_RESTAURANT_NAME).text.strip(),
+            "type": type_soup.text.strip() if type_soup is not None else "",
+        })
+    return rows

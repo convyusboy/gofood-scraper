@@ -1,11 +1,10 @@
 """Constants shared across the scraper: URLs, CSS/XPath selectors, and timing."""
 
 CITIES_URL = "https://gofood.co.id/en/cities"
-BASE_AREA = "jakarta"
 
 SCROLL_PAUSE_TIME = 1
-BOT_PAUSE_TIME = 5
 LOADING_TIME = 2
+DRIVER_RESOLVE_TIMEOUT = 30
 MAX_RETRY_COUNT = 3
 
 OUTPUT_DIR = "outputs"

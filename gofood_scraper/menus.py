@@ -22,6 +22,7 @@ from gofood_scraper.config import (
     CLASS_RESTAURANT_PRICE_LEVEL,
     CLASS_SMALL_MENU_CARD,
     GET_PAGE_HEIGHT,
+    MAX_RETRY_COUNT,
     SCROLL_PAUSE_TIME,
     SCROLL_TO_BOTTOM,
     SCROLL_TO_TOP,
@@ -38,12 +39,20 @@ DAY_COLUMNS = ["J", "K", "L", "M", "N", "O", "P"]
 def get_menus(output_dir, area, district, category_links, keyword_arr):
     """Fill in menu/hours/rating/price data for every category, retrying on transient errors."""
     for category_link in category_links:
-        while True:
+        for attempt in range(1, MAX_RETRY_COUNT + 1):
             try:
                 if _get_menus_for_category(output_dir, area, district, category_link, keyword_arr):
                     break
             except (NoSuchElementException, StaleElementReferenceException):
-                print("there's a bot, retrying")
+                if attempt == MAX_RETRY_COUNT:
+                    print(
+                        "giving up on {} after {} attempts - gofood.co.id may be showing a "
+                        "bot/CAPTCHA challenge to automated browsers right now. Progress made "
+                        "so far is saved in the .xlsx file; re-run later to fill in the rest."
+                        .format(category_link, MAX_RETRY_COUNT)
+                    )
+                else:
+                    print("there's a bot, retrying ({}/{})".format(attempt, MAX_RETRY_COUNT))
 
 
 def _get_menus_for_category(output_dir, area, district, category_link, keyword_arr):
@@ -155,16 +164,32 @@ def _extract_menus(soup, keyword_arr):
     return total_menu_with_inputted_keywords, total_menu, menu_with_inputted_keywords
 
 
-def _fill_open_hours(sheet_obj, row, soup):
+def _extract_open_hours(soup):
+    """Return {column_letter: opening_hours_text} for each day found on the page."""
     open_hours = soup.find_all("div", class_=CLASS_OPEN_HOURS_ROW)
     # each day's label has a different fixed prefix length to strip off ("Monday", "Tuesday", ...)
     prefix_lengths = [5, 6, 4, 5, 5, 5, 6]
-    for column, prefix_length, open_hour in zip(DAY_COLUMNS, prefix_lengths, open_hours):
-        sheet_obj["{}{}".format(column, row)] = open_hour.text.strip()[prefix_length:]
+    return {
+        column: open_hour.text.strip()[prefix_length:]
+        for column, prefix_length, open_hour in zip(DAY_COLUMNS, prefix_lengths, open_hours)
+    }
+
+
+def _extract_price(soup):
+    """Return the "<level>/4 (<range>)" price string, or None if not present on the page."""
+    price_range = soup.find_all("div", class_=CLASS_RESTAURANT_PRICE)
+    if not price_range:
+        return None
+    price_level = len(soup.find(attrs={"data-testid": "priceLevel"}).find_all("div", class_=CLASS_RESTAURANT_PRICE_LEVEL))
+    return "{}/4 ({})".format(price_level, price_range[2].text.strip())
+
+
+def _fill_open_hours(sheet_obj, row, soup):
+    for column, value in _extract_open_hours(soup).items():
+        sheet_obj["{}{}".format(column, row)] = value
 
 
 def _fill_price(sheet_obj, row, soup):
-    price_level = len(soup.find(attrs={"data-testid": "priceLevel"}).find_all("div", class_=CLASS_RESTAURANT_PRICE_LEVEL))
-    price_range = soup.find_all("div", class_=CLASS_RESTAURANT_PRICE)
-    if price_range:
-        sheet_obj["Q{}".format(row)] = "{}/4 ({})".format(price_level, price_range[2].text.strip())
+    price = _extract_price(soup)
+    if price is not None:
+        sheet_obj["Q{}".format(row)] = price

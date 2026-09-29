@@ -39,9 +39,19 @@ gofood_scraper/
 outputs/                generated .xlsx files (gitignored)
 ```
 
-## Notes
+## Development
 
-This scraper depends on gofood.co.id's current page structure and CSS class names, so it may break if the site changes.
+```bash
+pip install -r requirements-dev.txt
+pytest              # offline unit tests (fixture-based, no network/browser)
+pytest -m live      # opt-in tests that hit the real gofood.co.id site
+```
+
+## Known limitation
+
+`get_cities` (area/district listing) and `get_restaurants` (listing pages) are confirmed working against the live site. The `menus` stage, which visits each restaurant's own page, is currently met with a CAPTCHA/bot challenge from gofood.co.id on every visit from an automated browser. When that happens the scraper retries a few times, prints a message, and moves on — progress already written to the `.xlsx` file is preserved, but that category's menu/hours/price columns will stay blank until the site stops challenging automated requests.
+
+This scraper also depends on gofood.co.id's current page structure and CSS class names in general, so it may break again if the site changes.
 
 ## License
 
