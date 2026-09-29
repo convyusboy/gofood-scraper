@@ -1,6 +1,6 @@
 # Gofood Scraper
 
-A CLI tool that scrapes restaurant listings from [gofood.co.id](https://gofood.co.id) for a chosen area/district and category, then visits each restaurant page to collect its rating, opening hours, price level, and menu items matching your keywords. Results are written to Excel files.
+A CLI tool that scrapes restaurant listings from [gofood.co.id](https://gofood.co.id) for a free-text search like "ayam in Jakarta Selatan", then visits each restaurant page to collect its rating, opening hours, price level, and menu items matching your keywords. Results are written to Excel files.
 
 ## Installation
 
@@ -16,13 +16,20 @@ pip install -r requirements.txt
 python main.py
 ```
 
-You'll be prompted to:
+You'll be prompted for a single search query in the form `<keyword(s)> in <area or district>`:
 
-1. Choose an area, and optionally a district within it.
-2. Choose a category (Near me, Best sellers, Budget meal, Most loved, 24 hours, Healthy food, Pasti Ada Promo, or all of them).
-3. Enter menu keywords to search for (semicolon-separated), e.g. `nila bakar; nila goreng`.
+```
+ayam in Jakarta Selatan
+nila bakar or nila goreng in Bandung
+find restaurants that have nasi padang in Jakarta
+```
 
-The scraper opens Chrome windows to do its work — don't close them while it's running. Results are saved to `outputs/<area>[-<district>]-<category>.xlsx`.
+- The area/district is matched (fuzzily, case-insensitively) against gofood's real area/district list. Just the area name (e.g. `Jakarta`) searches the whole area; naming a district (e.g. `Jakarta Selatan`) narrows it down.
+- Multiple keywords can be separated with `,`, `and`, or `or`, e.g. `nila bakar or nila goreng`.
+- Filler words like "find", "restaurants", "that have" are ignored, so natural phrasing works.
+- If the location can't be matched, you'll be asked again with a hint.
+
+The scraper always searches gofood's "Near me" listing (the broadest single listing for an area). The scraper opens Chrome windows to do its work — don't close them while it's running. Results are saved to `outputs/<area>[-<district>]-near_me.xlsx`.
 
 ## Project layout
 
@@ -31,7 +38,8 @@ main.py               entry point
 gofood_scraper/
   config.py            constants: URLs, CSS/XPath selectors, timing
   browser.py            Selenium WebDriver setup
-  cli.py                interactive prompts
+  cli.py                interactive prompt for the search query
+  query.py              parses the free-text query into area/district/keywords
   cities.py             scrapes the areas/districts list
   restaurants.py         scrapes restaurant listings into Excel
   menus.py               visits each restaurant page for menu/hours/price/rating

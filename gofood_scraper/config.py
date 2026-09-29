@@ -47,26 +47,8 @@ SCROLL_TO_TOP = "window.scrollTo(0, document.body.scrollTop);"
 SCROLL_UP = "window.scrollBy(0,-400)"
 GET_PAGE_HEIGHT = "return document.body.scrollHeight"
 
-CATEGORY_ARR = [
-    "Near me",
-    "Best sellers",
-    "Budget meal",
-    "Most loved",
-    "24 hours",
-    "Healthy food",
-    "Pasti Ada Promo",
-    "Semua",
-]
-CATEGORY_LINK_ARR = [
-    ["near_me"],
-    ["best_seller"],
-    ["affordable_price"],
-    ["most_loved"],
-    ["24_hours"],
-    ["healthy_food"],
-    ["mkd_megapromo_all"],
-    ["near_me", "best_seller", "affordable_price", "most_loved", "24_hours", "healthy_food", "mkd_megapromo_all"],
-]
+# the gofood listing tab used for free-text queries: broadest single listing for an area/district
+DEFAULT_CATEGORY_LINK = "near_me"
 
 HEADERS = [
     "Link", "Image", "Rating", "Total Rating", "Name", "Type",
