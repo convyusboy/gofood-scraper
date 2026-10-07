@@ -1,5 +1,9 @@
 # Gofood Scraper
 
+[![CI](https://github.com/convyusboy/gofood-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/convyusboy/gofood-scraper/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+
 A CLI tool that scrapes restaurant listings from [gofood.co.id](https://gofood.co.id) for a free-text search like "ayam in Jakarta Selatan", then visits each restaurant page to collect its rating, opening hours, price level, and menu items matching your keywords. Results are written to Excel files.
 
 ## Why this project
