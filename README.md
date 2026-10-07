@@ -79,7 +79,9 @@ pytest -m live      # opt-in tests that hit the real gofood.co.id site
 
 ## Known limitation
 
-`get_cities` (area/district listing) and `get_restaurants` (listing pages) are confirmed working against the live site. The `menus` stage, which visits each restaurant's own page, is currently met with a CAPTCHA/bot challenge from gofood.co.id on every visit from an automated browser. When that happens the scraper retries a few times, prints a message, and moves on — progress already written to the `.xlsx` file is preserved, but that category's menu/hours/price columns will stay blank until the site stops challenging automated requests.
+`get_cities` (area/district listing) and `get_restaurants` (listing pages) are confirmed working against the live site. The `menus` stage, which visits each restaurant's own page, is currently met with a CAPTCHA/bot challenge from gofood.co.id on every visit from an automated browser.
+
+The scraper detects this (`BotChallengeError` in `menus.py`) and stops immediately instead of retrying. Progress already written to the `.xlsx` file is preserved, the menu/hours/price columns stay blank, and the process exits with code 1. Detection is a heuristic: it looks for CAPTCHA markers on a page that lacks the expected restaurant content. A weekly [live smoke test](.github/workflows/live-smoke.yml) flags selector drift on the listing pages.
 
 This scraper also depends on gofood.co.id's current page structure and CSS class names in general, so it may break again if the site changes.
 

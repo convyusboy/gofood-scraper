@@ -60,3 +60,9 @@ def test_multiple_restaurants():
 
 def test_no_restaurants_returns_empty_list():
     assert extract_restaurant_rows("<html><body></body></html>") == []
+
+
+def test_extract_restaurant_rows_skips_malformed_cards():
+    html = _restaurant_card("Good Place") + '<a class="{}" href="/en/broken"></a>'.format(CLASS_RESTAURANT_CARD)
+    rows = extract_restaurant_rows(html)
+    assert [row["name"] for row in rows] == ["Good Place"]

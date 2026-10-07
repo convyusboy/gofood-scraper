@@ -1,6 +1,7 @@
 """Visit each scraped restaurant page and fill in menu, hours, rating and price data."""
 
 import logging
+import re
 import time
 
 import openpyxl
@@ -31,12 +32,27 @@ from gofood_scraper.config import (
     XPATH_MENU_LINK,
     XPATH_REVIEW_LINK,
 )
-from gofood_scraper.excel import output_path
+from gofood_scraper.excel import column, output_path
 
 # column letters for each day, in the order the open-hours rows appear on the page
 log = logging.getLogger(__name__)
 
-DAY_COLUMNS = ["J", "K", "L", "M", "N", "O", "P"]
+DAY_COLUMNS = [column(day) for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")]
+
+# Lower-case markers that suggest a CAPTCHA / bot-challenge page. They are only trusted when the
+# page also lacks the restaurant content we expect (see _is_bot_challenge), since a normal page
+# may legitimately ship a captcha script.
+BOT_CHALLENGE_MARKERS = (
+    "captcha",
+    "cf-challenge",
+    "verify you are human",
+    "are you a robot",
+    "unusual traffic",
+)
+
+
+class BotChallengeError(Exception):
+    """gofood.co.id served a CAPTCHA/bot challenge instead of the restaurant page."""
 
 
 def get_menus(output_dir, area, district, category_links, keyword_arr):
@@ -51,6 +67,11 @@ def get_menus(output_dir, area, district, category_links, keyword_arr):
             try:
                 if _get_menus_for_category(output_dir, area, district, category_link, keyword_arr):
                     break
+            except BotChallengeError as exc:
+                # retrying a challenge only hammers the site, so stop right away
+                all_done = False
+                log.error("%s Stopping; rows already scraped are saved in the .xlsx file.", exc)
+                break
             except (NoSuchElementException, StaleElementReferenceException):
                 if attempt == MAX_RETRY_COUNT:
                     all_done = False
@@ -75,9 +96,9 @@ def _get_menus_for_category(output_dir, area, district, category_link, keyword_a
         if row < 2:
             continue
         wb_obj.save(path)
-        if sheet_obj["J{}".format(row)].value is not None:
+        if sheet_obj["{}{}".format(column("Monday"), row)].value is not None:
             continue
-        log.info("processing row %d - %s", row, sheet_obj["E{}".format(row)].value)
+        log.info("processing row %d - %s", row, sheet_obj["{}{}".format(column("Name"), row)].value)
         _scrape_restaurant_row(sheet_obj, row, cell.value, keyword_arr)
         wb_obj.save(path)
 
@@ -90,6 +111,7 @@ def _scrape_restaurant_row(sheet_obj, row, url, keyword_arr):
     try:
         driver.get(url)
         time.sleep(SCROLL_PAUSE_TIME)
+        _raise_if_bot_challenge(driver.page_source, url)
 
         try:
             driver.find_element(By.XPATH, XPATH_REVIEW_LINK).click()
@@ -115,32 +137,49 @@ def _scrape_restaurant_row(sheet_obj, row, url, keyword_arr):
             driver.find_element(By.XPATH, XPATH_MENU_LINK).click()
         except (ElementClickInterceptedException, ElementNotInteractableException):
             pass
+        except NoSuchElementException:
+            # a challenge page has none of the expected elements; tell it apart from a transient miss
+            _raise_if_bot_challenge(driver.page_source, url)
+            raise
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
     finally:
         driver.quit()
 
+    _raise_if_bot_challenge(str(soup), url)
+
     total_menu_with_inputted_keywords, total_menu, menu_with_inputted_keywords = _extract_menus(soup, keyword_arr)
 
-    sheet_obj["D{}".format(row)] = total_rating
-    sheet_obj["G{}".format(row)] = "{}/{}".format(total_menu_with_inputted_keywords, total_menu)
-    sheet_obj["H{}".format(row)] = menu_with_inputted_keywords
+    sheet_obj[column("Total Rating") + str(row)] = total_rating
+    sheet_obj[column("Total Menu with Inputted Keywords") + str(row)] = "{}/{}".format(
+        total_menu_with_inputted_keywords, total_menu
+    )
+    sheet_obj[column("Menu with Inputted Keywords") + str(row)] = menu_with_inputted_keywords
 
     address = soup.find("div", class_=CLASS_RESTAURANT_ADDRESS)
     if address is not None:
-        sheet_obj["I{}".format(row)] = address.text.strip()
+        sheet_obj[column("Address") + str(row)] = address.text.strip()
 
     _fill_open_hours(sheet_obj, row, soup)
     _fill_price(sheet_obj, row, soup)
 
 
+def _is_bot_challenge(html):
+    """True if the page looks like a CAPTCHA/bot challenge rather than a restaurant page."""
+    if CLASS_MENU_CARD in html:
+        return False
+    html_lower = html.lower()
+    return any(marker in html_lower for marker in BOT_CHALLENGE_MARKERS)
+
+
+def _raise_if_bot_challenge(html, url):
+    if _is_bot_challenge(html):
+        raise BotChallengeError("gofood.co.id served a CAPTCHA/bot challenge for {}.".format(url))
+
+
 def _extract_total_rating(rating_html_content):
-    find_rating_count_idx = rating_html_content.find("ratingCount")
-    if find_rating_count_idx == -1:
-        return "-"
-    idx_start = find_rating_count_idx + 13
-    idx_end = rating_html_content[idx_start:].find(",") + idx_start
-    return rating_html_content[idx_start:idx_end]
+    match = re.search(r'ratingCount"\s*:\s*([^,}\s]+)', rating_html_content)
+    return match.group(1) if match else "-"
 
 
 def _scroll_to_bottom(driver):
@@ -160,8 +199,12 @@ def _extract_menus(soup, keyword_arr):
     total_menu_with_inputted_keywords = 0
     menu_with_inputted_keywords = ""
     for menu in menus:
+        big_menu_soup = menu.find("h3", class_=CLASS_BIG_MENU_CARD)
+        if big_menu_soup is None:
+            log.debug("skipping a menu card without a name")
+            continue
         total_menu += 1
-        big_menu = menu.find("h3", class_=CLASS_BIG_MENU_CARD).text.strip()
+        big_menu = big_menu_soup.text.strip()
         keywords_found = any(x in big_menu.lower() for x in keyword_arr)
         if not keywords_found:
             small_menu_soup = menu.find("p", class_=CLASS_SMALL_MENU_CARD)
@@ -189,19 +232,19 @@ def _extract_open_hours(soup):
 def _extract_price(soup):
     """Return the "<level>/4 (<range>)" price string, or None if not present on the page."""
     price_range = soup.find_all("div", class_=CLASS_RESTAURANT_PRICE)
-    if not price_range:
-        return None
     price_level_soup = soup.find(attrs={"data-testid": "priceLevel"})
+    if len(price_range) < 3 or price_level_soup is None:
+        return None
     price_level = len(price_level_soup.find_all("div", class_=CLASS_RESTAURANT_PRICE_LEVEL))
     return "{}/4 ({})".format(price_level, price_range[2].text.strip())
 
 
 def _fill_open_hours(sheet_obj, row, soup):
-    for column, value in _extract_open_hours(soup).items():
-        sheet_obj["{}{}".format(column, row)] = value
+    for col, value in _extract_open_hours(soup).items():
+        sheet_obj["{}{}".format(col, row)] = value
 
 
 def _fill_price(sheet_obj, row, soup):
     price = _extract_price(soup)
     if price is not None:
-        sheet_obj["Q{}".format(row)] = price
+        sheet_obj[column("Gofood Price Level") + str(row)] = price

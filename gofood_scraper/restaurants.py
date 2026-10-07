@@ -24,7 +24,7 @@ from gofood_scraper.config import (
     SCROLL_UP,
     XPATH_LOAD_MORE_LINK,
 )
-from gofood_scraper.excel import new_results_workbook, output_path
+from gofood_scraper.excel import column, new_results_workbook, output_path
 
 log = logging.getLogger(__name__)
 
@@ -91,11 +91,11 @@ def get_restaurants(output_dir, area, district, category_links):
         log.info("total restaurants: %d", len(rows))
 
         for i, restaurant_row in enumerate(rows, start=2):
-            sheet_obj["A{}".format(i)] = restaurant_row["link"]
-            sheet_obj["B{}".format(i)] = restaurant_row["image"]
-            sheet_obj["C{}".format(i)] = restaurant_row["rating"]
-            sheet_obj["E{}".format(i)] = restaurant_row["name"]
-            sheet_obj["F{}".format(i)] = restaurant_row["type"]
+            sheet_obj[column("Link") + str(i)] = restaurant_row["link"]
+            sheet_obj[column("Image") + str(i)] = restaurant_row["image"]
+            sheet_obj[column("Rating") + str(i)] = restaurant_row["rating"]
+            sheet_obj[column("Name") + str(i)] = restaurant_row["name"]
+            sheet_obj[column("Type") + str(i)] = restaurant_row["type"]
 
         wb_obj.save(path)
 
@@ -107,13 +107,18 @@ def extract_restaurant_rows(html_content):
 
     rows = []
     for restaurant in restaurants:
+        name_soup = restaurant.find("p", class_=CLASS_RESTAURANT_NAME)
+        if name_soup is None or not restaurant.get("href"):
+            log.warning("skipping a restaurant card with no name or link; selectors may be out of date")
+            continue
         rating_soup = restaurant.find("div", class_=CLASS_RESTAURANT_RATING)
         type_soup = restaurant.find("p", class_=CLASS_RESTAURANT_TYPE)
+        image_soup = restaurant.find("img", class_=CLASS_RESTAURANT_IMAGE)
         rows.append({
             "link": RESTAURANT_URL.format(restaurant["href"]),
-            "image": restaurant.find("img", class_=CLASS_RESTAURANT_IMAGE)["src"],
+            "image": image_soup.get("src", "") if image_soup is not None else "",
             "rating": rating_soup.text.strip() if rating_soup is not None else "-",
-            "name": restaurant.find("p", class_=CLASS_RESTAURANT_NAME).text.strip(),
+            "name": name_soup.text.strip(),
             "type": type_soup.text.strip() if type_soup is not None else "",
         })
     return rows
