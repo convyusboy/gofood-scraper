@@ -1,7 +1,7 @@
 import os
 
 from gofood_scraper.config import HEADERS
-from gofood_scraper.excel import new_results_workbook, output_path, set_headers
+from gofood_scraper.excel import new_results_workbook, output_path
 
 
 def test_output_path_without_district():

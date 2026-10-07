@@ -1,6 +1,9 @@
-"""Entry point: asks for a free-text search query, then scrapes matching restaurants."""
+"""Entry point: scrapes restaurants matching a free-text search query."""
 
+import argparse
+import logging
 import os
+import sys
 
 from gofood_scraper.cities import get_cities
 from gofood_scraper.cli import input_search_query
@@ -9,36 +12,63 @@ from gofood_scraper.menus import get_menus
 from gofood_scraper.query import parse_query
 from gofood_scraper.restaurants import get_restaurants
 
+log = logging.getLogger(__name__)
 
-def run():
-    print("================= Welcome to gofood scraper ==================")
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="gofood-scraper",
+        description="Scrape gofood.co.id restaurants for a query like 'ayam in Jakarta Selatan'.",
+    )
+    parser.add_argument(
+        "-q", "--query", help="search query; if omitted you will be prompted for one"
+    )
+    parser.add_argument("-o", "--output-dir", default=OUTPUT_DIR, help="folder for .xlsx output")
+    parser.add_argument("-v", "--verbose", action="store_true", help="show debug logging")
+    return parser
+
+
+def run(argv=None):
+    """Run the scraper. Returns a process exit code (0 on success, 1 if menus were blocked)."""
+    args = build_parser().parse_args(argv)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s"
+    )
+
+    log.info("Welcome to gofood scraper")
     area_arr, districts_dict = get_cities()
 
+    query = args.query
     while True:
-        query = input_search_query()
+        if query is None:
+            query = input_search_query()
         try:
             area_str, area_link, district_str, district_link, keyword_arr = parse_query(
                 query, area_arr, districts_dict
             )
             break
         except ValueError as exc:
-            print(exc)
+            if args.query is not None:
+                log.error("%s", exc)
+                return 2
+            log.warning("%s", exc)
+            query = None
 
     location_str = district_str or area_str
-    print('\nSearching for "{}" in {}'.format(", ".join(keyword_arr), location_str))
+    log.info('Searching for "%s" in %s', ", ".join(keyword_arr), location_str)
+    log.info("Start scraping; don't close any Google Chrome window that opens.")
 
-    print("\nStart scraping")
-    print("Please wait until the process is done, don't close any google chrome window opened")
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
     category_links = [DEFAULT_CATEGORY_LINK]
-    get_restaurants(OUTPUT_DIR, area_link, district_link, category_links)
-    get_menus(OUTPUT_DIR, area_link, district_link, category_links, keyword_arr)
+    get_restaurants(args.output_dir, area_link, district_link, category_links)
+    completed = get_menus(args.output_dir, area_link, district_link, category_links, keyword_arr)
 
-    print("================= The scraping process is done ===============")
-    print("=========== Check the xlsx file(s) in the {} folder ===========".format(OUTPUT_DIR))
-    print("=========== Thank you for using the gofood scraper ===========")
+    if not completed:
+        log.error("Finished with incomplete menu data; see the message above.")
+        return 1
+    log.info("Done. Check the .xlsx file(s) in the %s folder.", args.output_dir)
+    return 0
 
 
 if __name__ == "__main__":
-    run()
+    sys.exit(run())

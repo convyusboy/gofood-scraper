@@ -36,7 +36,7 @@ def _resolve_driver_path(timeout=DRIVER_RESOLVE_TIMEOUT):
             "Timed out after {}s resolving chromedriver (webdriver-manager's online "
             "version check appears to be stuck). Check your network/proxy, or clear "
             "~/.wdm and try again.".format(timeout)
-        )
+        ) from None
     if status == "error":
         raise value
     return value

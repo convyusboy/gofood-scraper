@@ -1,5 +1,6 @@
 """Scrape restaurant listing pages into per-category Excel workbooks."""
 
+import logging
 import time
 
 from bs4 import BeautifulSoup
@@ -24,6 +25,8 @@ from gofood_scraper.config import (
     XPATH_LOAD_MORE_LINK,
 )
 from gofood_scraper.excel import new_results_workbook, output_path
+
+log = logging.getLogger(__name__)
 
 
 def _load_full_listing(driver, url):
@@ -67,7 +70,7 @@ def _load_full_listing(driver, url):
 def get_restaurants(output_dir, area, district, category_links):
     """Scrape the restaurant listing for each category into <output_dir>/<area>[-<district>]-<category>.xlsx."""
     for category_link in category_links:
-        print(area, district, category_link)
+        log.debug("area=%s district=%s category=%s", area, district, category_link)
         url = (
             RESTAURANTS_URL_WITHOUT_DISTRICT.format(area, category_link)
             if district == ""
@@ -85,7 +88,7 @@ def get_restaurants(output_dir, area, district, category_links):
         wb_obj, sheet_obj = new_results_workbook()
 
         rows = extract_restaurant_rows(html_content)
-        print("total restaurants: {}".format(len(rows)))
+        log.info("total restaurants: %d", len(rows))
 
         for i, restaurant_row in enumerate(rows, start=2):
             sheet_obj["A{}".format(i)] = restaurant_row["link"]

@@ -94,7 +94,7 @@ def test_extract_price_missing():
     assert _extract_price(soup) is None
 
 
-def test_get_menus_gives_up_after_max_retries_instead_of_hanging(monkeypatch, capsys):
+def test_get_menus_gives_up_after_max_retries_instead_of_hanging(monkeypatch, caplog):
     call_count = 0
 
     def always_fails(*args, **kwargs):
@@ -104,10 +104,11 @@ def test_get_menus_gives_up_after_max_retries_instead_of_hanging(monkeypatch, ca
 
     monkeypatch.setattr(menus_module, "_get_menus_for_category", always_fails)
 
-    get_menus("outputs", "jakarta", "", ["near_me"], ["ayam"])
+    completed = get_menus("outputs", "jakarta", "", ["near_me"], ["ayam"])
 
+    assert completed is False
     assert call_count == MAX_RETRY_COUNT
-    assert "giving up on near_me" in capsys.readouterr().out
+    assert "giving up on near_me" in caplog.text
 
 
 def test_get_menus_stops_retrying_once_a_category_succeeds(monkeypatch):

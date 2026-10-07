@@ -1,5 +1,3 @@
-from gofood_scraper.restaurants import extract_restaurant_rows
-
 from gofood_scraper.config import (
     CLASS_RESTAURANT_CARD,
     CLASS_RESTAURANT_IMAGE,
@@ -7,6 +5,7 @@ from gofood_scraper.config import (
     CLASS_RESTAURANT_RATING,
     CLASS_RESTAURANT_TYPE,
 )
+from gofood_scraper.restaurants import extract_restaurant_rows
 
 
 def _restaurant_card(name, restaurant_type=None, rating=None):

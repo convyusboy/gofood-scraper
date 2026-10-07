@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gofood-scraper"
+version = "0.2.0"
+description = "CLI that scrapes gofood.co.id restaurants for a free-text query into Excel."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ridho Akbarisanto" }]
+dependencies = [
+    "selenium>=4.15,<5",
+    "webdriver-manager>=4,<5",
+    "beautifulsoup4>=4.12,<5",
+    "openpyxl>=3.1,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[project.scripts]
+gofood-scraper = "gofood_scraper.main:run"
+
+[tool.setuptools]
+packages = ["gofood_scraper"]
+
+[tool.pytest.ini_options]
+markers = ["live: hits the real gofood.co.id site (run explicitly with `pytest -m live`)"]
+addopts = '-m "not live"'
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "UP032",  # the codebase consistently uses str.format
+    "B905",  # zip() over day columns/open hours may legitimately differ in length
+]

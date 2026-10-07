@@ -1,5 +1,6 @@
 """Visit each scraped restaurant page and fill in menu, hours, rating and price data."""
 
+import logging
 import time
 
 import openpyxl
@@ -33,11 +34,18 @@ from gofood_scraper.config import (
 from gofood_scraper.excel import output_path
 
 # column letters for each day, in the order the open-hours rows appear on the page
+log = logging.getLogger(__name__)
+
 DAY_COLUMNS = ["J", "K", "L", "M", "N", "O", "P"]
 
 
 def get_menus(output_dir, area, district, category_links, keyword_arr):
-    """Fill in menu/hours/rating/price data for every category, retrying on transient errors."""
+    """Fill in menu/hours/rating/price data for every category, retrying on transient errors.
+
+    Returns True if every category was completed, False if any was abandoned
+    (typically because gofood.co.id served a bot/CAPTCHA challenge).
+    """
+    all_done = True
     for category_link in category_links:
         for attempt in range(1, MAX_RETRY_COUNT + 1):
             try:
@@ -45,14 +53,17 @@ def get_menus(output_dir, area, district, category_links, keyword_arr):
                     break
             except (NoSuchElementException, StaleElementReferenceException):
                 if attempt == MAX_RETRY_COUNT:
-                    print(
-                        "giving up on {} after {} attempts - gofood.co.id may be showing a "
+                    all_done = False
+                    log.error(
+                        "giving up on %s after %d attempts - gofood.co.id may be showing a "
                         "bot/CAPTCHA challenge to automated browsers right now. Progress made "
-                        "so far is saved in the .xlsx file; re-run later to fill in the rest."
-                        .format(category_link, MAX_RETRY_COUNT)
+                        "so far is saved in the .xlsx file; re-run later to fill in the rest.",
+                        category_link,
+                        MAX_RETRY_COUNT,
                     )
                 else:
-                    print("there's a bot, retrying ({}/{})".format(attempt, MAX_RETRY_COUNT))
+                    log.warning("there's a bot, retrying (%d/%d)", attempt, MAX_RETRY_COUNT)
+    return all_done
 
 
 def _get_menus_for_category(output_dir, area, district, category_link, keyword_arr):
@@ -66,7 +77,7 @@ def _get_menus_for_category(output_dir, area, district, category_link, keyword_a
         wb_obj.save(path)
         if sheet_obj["J{}".format(row)].value is not None:
             continue
-        print("processing row ", row, " - ", sheet_obj["E{}".format(row)].value)
+        log.info("processing row %d - %s", row, sheet_obj["E{}".format(row)].value)
         _scrape_restaurant_row(sheet_obj, row, cell.value, keyword_arr)
         wb_obj.save(path)
 
@@ -180,7 +191,8 @@ def _extract_price(soup):
     price_range = soup.find_all("div", class_=CLASS_RESTAURANT_PRICE)
     if not price_range:
         return None
-    price_level = len(soup.find(attrs={"data-testid": "priceLevel"}).find_all("div", class_=CLASS_RESTAURANT_PRICE_LEVEL))
+    price_level_soup = soup.find(attrs={"data-testid": "priceLevel"})
+    price_level = len(price_level_soup.find_all("div", class_=CLASS_RESTAURANT_PRICE_LEVEL))
     return "{}/4 ({})".format(price_level, price_range[2].text.strip())
 
 

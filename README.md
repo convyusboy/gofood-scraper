@@ -2,21 +2,42 @@
 
 A CLI tool that scrapes restaurant listings from [gofood.co.id](https://gofood.co.id) for a free-text search like "ayam in Jakarta Selatan", then visits each restaurant page to collect its rating, opening hours, price level, and menu items matching your keywords. Results are written to Excel files.
 
+## Why this project
+
+I built this to practice scraping a JavaScript-heavy, frequently changing site in a way that stays maintainable. Things it demonstrates:
+
+- Separating pure HTML parsing from Selenium I/O, so the parsers are covered by fast offline fixture tests (36 tests, no browser or network needed).
+- A free-text query parser that turns phrases like `nila bakar or nila goreng in Bandung` into keywords plus a fuzzy-matched location.
+- Resumable output: the workbook is saved after every row, so an interrupted run picks up where it left off.
+- Being upfront about limits: see [Known limitation](#known-limitation) and [Responsible use](#responsible-use).
+
+## How it works
+
+```
+free-text query ──► parse_query ──► get_cities ──► get_restaurants ──► get_menus ──► .xlsx
+ "ayam in Jakarta    keywords +      validate       listing page        per-restaurant   outputs/
+  Selatan"           location        location       cards               detail pages
+```
+
 ## Installation
 
 Requires Python 3.10+ and Google Chrome installed.
 
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Usage
 
 ```bash
-python main.py
+gofood-scraper                              # prompts for a query
+gofood-scraper -q "ayam in Jakarta Selatan"  # non-interactive
+gofood-scraper --help                       # -o/--output-dir, -v/--verbose
 ```
 
-You'll be prompted for a single search query in the form `<keyword(s)> in <area or district>`:
+(`python -m gofood_scraper` works too.) The exit code is 0 on success, 1 if the menus stage was blocked, and 2 for an unrecognised `--query`.
+
+Without `-q` you'll be prompted for a single search query in the form `<keyword(s)> in <area or district>`:
 
 ```
 ayam in Jakarta Selatan
@@ -34,8 +55,8 @@ The scraper always searches gofood's "Near me" listing (the broadest single list
 ## Project layout
 
 ```
-main.py               entry point
 gofood_scraper/
+  main.py               entry point and argument parsing
   config.py            constants: URLs, CSS/XPath selectors, timing
   browser.py            Selenium WebDriver setup
   cli.py                interactive prompt for the search query
@@ -50,8 +71,9 @@ outputs/                generated .xlsx files (gitignored)
 ## Development
 
 ```bash
-pip install -r requirements-dev.txt
-pytest              # offline unit tests (fixture-based, no network/browser)
+pip install -e ".[dev]"
+ruff check .
+pytest --cov=gofood_scraper   # offline unit tests (fixture-based, no network/browser)
 pytest -m live      # opt-in tests that hit the real gofood.co.id site
 ```
 
@@ -60,6 +82,14 @@ pytest -m live      # opt-in tests that hit the real gofood.co.id site
 `get_cities` (area/district listing) and `get_restaurants` (listing pages) are confirmed working against the live site. The `menus` stage, which visits each restaurant's own page, is currently met with a CAPTCHA/bot challenge from gofood.co.id on every visit from an automated browser. When that happens the scraper retries a few times, prints a message, and moves on — progress already written to the `.xlsx` file is preserved, but that category's menu/hours/price columns will stay blank until the site stops challenging automated requests.
 
 This scraper also depends on gofood.co.id's current page structure and CSS class names in general, so it may break again if the site changes.
+
+## Responsible use
+
+This is a personal, educational project. It is not affiliated with GoFood or Gojek.
+
+- Check gofood.co.id's Terms of Service and `robots.txt` before running it, and only scrape what you are allowed to.
+- Keep request volume low. The tool paces itself with fixed pauses and is not meant for bulk or commercial collection.
+- It deliberately does **not** attempt to bypass CAPTCHAs or other bot protection. When the site challenges the browser, the right behaviour is to stop, not to evade.
 
 ## License
 
