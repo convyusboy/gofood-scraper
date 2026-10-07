@@ -2,6 +2,8 @@ import pytest
 
 from gofood_scraper import main
 
+exported = []
+
 
 @pytest.fixture
 def stubbed(monkeypatch, tmp_path):
@@ -10,6 +12,9 @@ def stubbed(monkeypatch, tmp_path):
         main, "parse_query", lambda q, a, d: ("Jakarta", "jakarta", "", "", ["ayam"])
     )
     monkeypatch.setattr(main, "get_restaurants", lambda *a, **k: None)
+    monkeypatch.setattr(main, "read_rows", lambda path: [])
+    monkeypatch.setattr(main, "export", lambda path, formats: exported.append(formats) or [])
+    exported.clear()
     return tmp_path
 
 
@@ -29,3 +34,9 @@ def test_run_returns_two_on_bad_query_flag(monkeypatch, stubbed):
 
     monkeypatch.setattr(main, "parse_query", bad)
     assert main.run(["-q", "nonsense", "-o", str(stubbed)]) == 2
+
+
+def test_run_exports_requested_formats(monkeypatch, stubbed):
+    monkeypatch.setattr(main, "get_menus", lambda *a, **k: True)
+    main.run(["-q", "ayam in Jakarta", "-o", str(stubbed), "-f", "csv", "-f", "json"])
+    assert exported == [["csv", "json"]]

@@ -8,6 +8,8 @@ import sys
 from gofood_scraper.cities import get_cities
 from gofood_scraper.cli import input_search_query
 from gofood_scraper.config import DEFAULT_CATEGORY_LINK, OUTPUT_DIR
+from gofood_scraper.excel import output_path
+from gofood_scraper.export import FORMATS, export, read_rows, summarize
 from gofood_scraper.menus import get_menus
 from gofood_scraper.query import parse_query
 from gofood_scraper.restaurants import get_restaurants
@@ -24,6 +26,10 @@ def build_parser():
         "-q", "--query", help="search query; if omitted you will be prompted for one"
     )
     parser.add_argument("-o", "--output-dir", default=OUTPUT_DIR, help="folder for .xlsx output")
+    parser.add_argument(
+        "-f", "--format", action="append", choices=FORMATS, default=[],
+        help="also export the results as csv and/or json (repeatable); .xlsx is always written",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="show debug logging")
     return parser
 
@@ -62,6 +68,16 @@ def run(argv=None):
     category_links = [DEFAULT_CATEGORY_LINK]
     get_restaurants(args.output_dir, area_link, district_link, category_links)
     completed = get_menus(args.output_dir, area_link, district_link, category_links, keyword_arr)
+
+    xlsx_path = output_path(args.output_dir, area_link, district_link, category_links[0])
+    stats = summarize(read_rows(xlsx_path))
+    log.info(
+        "%d restaurants (%d rated), mean rating %s; top types: %s",
+        stats["count"], stats["rated"], stats["mean_rating"] or "n/a",
+        ", ".join("{} ({})".format(name, n) for name, n in stats["top_types"]) or "n/a",
+    )
+    for path in export(xlsx_path, args.format):
+        log.info("Wrote %s", path)
 
     if not completed:
         log.error("Finished with incomplete menu data; see the message above.")

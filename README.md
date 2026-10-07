@@ -36,7 +36,8 @@ pip install .
 ```bash
 gofood-scraper                              # prompts for a query
 gofood-scraper -q "ayam in Jakarta Selatan"  # non-interactive
-gofood-scraper --help                       # -o/--output-dir, -v/--verbose
+gofood-scraper -q "ayam in Jakarta" -f csv -f json   # also export CSV/JSON
+gofood-scraper --help                       # -o/--output-dir, -f/--format, -v/--verbose
 ```
 
 (`python -m gofood_scraper` works too.) The exit code is 0 on success, 1 if the menus stage was blocked, and 2 for an unrecognised `--query`.
@@ -54,7 +55,7 @@ find restaurants that have nasi padang in Jakarta
 - Filler words like "find", "restaurants", "that have" are ignored, so natural phrasing works.
 - If the location can't be matched, you'll be asked again with a hint.
 
-The scraper always searches gofood's "Near me" listing (the broadest single listing for an area). The scraper opens Chrome windows to do its work — don't close them while it's running. Results are saved to `outputs/<area>[-<district>]-near_me.xlsx`.
+The scraper always searches gofood's "Near me" listing (the broadest single listing for an area). The scraper opens Chrome windows to do its work — don't close them while it's running. Results are saved to `outputs/<area>[-<district>]-near_me.xlsx` (plus `.csv`/`.json` with `-f`). After scraping, a one-line summary logs the restaurant count, mean rating and most common types.
 
 ## Project layout
 
@@ -69,6 +70,7 @@ gofood_scraper/
   restaurants.py         scrapes restaurant listings into Excel
   menus.py               visits each restaurant page for menu/hours/price/rating
   excel.py               Excel workbook helpers
+  export.py              CSV/JSON export and a rating/type summary
 outputs/                generated .xlsx files (gitignored)
 ```
 
